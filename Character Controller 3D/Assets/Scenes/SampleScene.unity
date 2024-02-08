@@ -250,7 +250,7 @@ MonoBehaviour:
   inputController: {fileID: 1657072623}
   horizontalRotationRoot: {fileID: 1797230193}
   verticalRotationRoot: {fileID: 1699196554}
-  rotationSpeed: 5
+  rotationSpeed: 1
   maxVerticalAngle: 85
   minVerticalAngle: 0
 --- !u!114 &185192801
