@@ -615,8 +615,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rigidbody: {fileID: 1784993385}
   cameraController: {fileID: 172532280}
-  moveSpeed: 5
+  moveForce: 800
   lookSpeed: 0.3
+  jumpForce: 500
+  isDebug: 1
+  horizontal: 0
+  vertical: 0
+  jumpRequest: 0
+  isGrounded: 0
 --- !u!54 &1784993385
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -625,8 +631,8 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1784993381}
   serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0.15
+  m_Mass: 80
+  m_Drag: 1
   m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}

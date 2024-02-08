@@ -1,5 +1,6 @@
 namespace CharacterController3D
 {
+    using System;
     using Sirenix.OdinInspector;
     using UnityEngine;
 
@@ -9,6 +10,7 @@ namespace CharacterController3D
 
         private const string COMPONENTS = "Components";
         private const string SETTINGS = "Settings";
+        private const string DEBUG = "Debug";
 
         #endregion
         
@@ -17,15 +19,39 @@ namespace CharacterController3D
         [SerializeField, BoxGroup(COMPONENTS)]
         private CameraController cameraController;
         [SerializeField, BoxGroup(SETTINGS)]
-        private float moveSpeed;
+        private float moveForce;
         [SerializeField, BoxGroup(SETTINGS)]
         private float lookSpeed;
+        [SerializeField, BoxGroup(SETTINGS)]
+        private float jumpForce;
+        
+        [SerializeField, FoldoutGroup(DEBUG)]
+        private bool isDebug;
+        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        private float horizontal;
+        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        private float vertical;
+        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        private bool jumpRequest;
+        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        private bool isGrounded;
+
+        private void Update()
+        {
+            if (isGrounded)
+            {
+                horizontal = Input.GetAxis("Horizontal");
+                vertical = Input.GetAxis("Vertical");
+            }
+            
+            if(Input.GetButtonDown("Jump") && isGrounded)
+            {
+                jumpRequest = true;
+            }
+        }
 
         private void FixedUpdate()
         {
-            var horizontal = Input.GetAxis("Horizontal");
-            var vertical = Input.GetAxis("Vertical");
-
             var moveDirection = cameraController.Right * horizontal + cameraController.Forward * vertical;
             moveDirection.Normalize();
             
@@ -35,13 +61,35 @@ namespace CharacterController3D
                 transform.LookAt(Vector3.Lerp(position + transform.forward,
                     position + moveDirection, lookSpeed));
             }
+
+            rigidbody.AddForce(moveDirection * moveForce, ForceMode.Force);
             
-            rigidbody.velocity = moveDirection * moveSpeed;
+            if (jumpRequest)
+            {
+                rigidbody.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+                jumpRequest = false;
+            }
         }
 
         private void LateUpdate()
         {
             cameraController.transform.position = transform.position;
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if(collision.gameObject.layer == LayerMask.NameToLayer("Default"))
+            {
+                isGrounded = true;
+            }
+        }
+        
+        private void OnCollisionExit(Collision collision)
+        {
+            if(collision.gameObject.layer == LayerMask.NameToLayer("Default"))
+            {
+                isGrounded = false;
+            }
         }
     }
 }
