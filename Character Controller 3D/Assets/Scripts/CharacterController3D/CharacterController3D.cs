@@ -1,6 +1,7 @@
 namespace CharacterController3D
 {
     using System;
+    using InputController;
     using Sirenix.OdinInspector;
     using UnityEngine;
 
@@ -18,6 +19,8 @@ namespace CharacterController3D
         private Rigidbody rigidbody;
         [SerializeField, BoxGroup(COMPONENTS)]
         private CameraController cameraController;
+        [SerializeField, BoxGroup(COMPONENTS)]
+        private InputController inputController;
         [SerializeField, BoxGroup(SETTINGS)]
         private float moveForce;
         [SerializeField, BoxGroup(SETTINGS)]
@@ -32,22 +35,15 @@ namespace CharacterController3D
         [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
         private float vertical;
         [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
-        private bool jumpRequest;
-        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
         private bool isGrounded;
 
-        private void Update()
+        private void Awake()
         {
-            if (isGrounded)
-            {
-                horizontal = Input.GetAxis("Horizontal");
-                vertical = Input.GetAxis("Vertical");
-            }
+            // TEMP: Remove this line
+            inputController.Initialize();
             
-            if(Input.GetButtonDown("Jump") && isGrounded)
-            {
-                jumpRequest = true;
-            }
+            inputController.OnMove += OnMoveHandler;
+            inputController.OnJumpDown += OnJumpHandler;
         }
 
         private void FixedUpdate()
@@ -63,12 +59,6 @@ namespace CharacterController3D
             }
 
             rigidbody.AddForce(moveDirection * moveForce, ForceMode.Force);
-            
-            if (jumpRequest)
-            {
-                rigidbody.AddForce(transform.up * jumpForce, ForceMode.Impulse);
-                jumpRequest = false;
-            }
         }
 
         private void LateUpdate()
@@ -90,6 +80,19 @@ namespace CharacterController3D
             {
                 isGrounded = false;
             }
+        }
+
+        private void OnMoveHandler(Vector2 input)
+        {
+            if (!isGrounded) return;
+            horizontal = input.x;
+            vertical = input.y;
+        }
+        
+        private void OnJumpHandler()
+        {
+            if (!isGrounded) return;
+            rigidbody.AddForce(transform.up * jumpForce, ForceMode.Impulse);
         }
     }
 }

@@ -1,5 +1,7 @@
 namespace CharacterController3D
 {
+    using System;
+    using InputController;
     using Sirenix.OdinInspector;
     using UnityEngine;
 
@@ -8,9 +10,12 @@ namespace CharacterController3D
         #region Odin Attributes
 
         private const string SETTINGS = "Settings";
+        private const string COMPONENTS = "Components";
 
         #endregion
         
+        [SerializeField, BoxGroup(COMPONENTS)]
+        private InputController inputController;
         [SerializeField, BoxGroup(SETTINGS)]
         private Transform horizontalRotationRoot;
         [SerializeField, BoxGroup(SETTINGS)]
@@ -26,16 +31,18 @@ namespace CharacterController3D
         public Vector3 Right => horizontalRotationRoot.right;
         public Vector3 Forward => horizontalRotationRoot.forward;
 
-        private void LateUpdate()
+        private void Awake()
         {
-            var horizontalMouse = Input.GetAxis("Mouse X");
-            var verticalMouse= Input.GetAxis("Mouse Y");
+            inputController.OnLook += OnLookHandler;
+        }
 
-            horizontalRotationRoot.Rotate(Vector3.up, horizontalMouse * rotationSpeed);
-            var eulerAnglesX = verticalRotationRoot.eulerAngles.x - verticalMouse *  rotationSpeed;
+        private void OnLookHandler(Vector2 obj)
+        {
+            horizontalRotationRoot.Rotate(Vector3.up, obj.x * rotationSpeed);
+            var eulerAnglesX = verticalRotationRoot.eulerAngles.x - obj.y *  rotationSpeed;
             if (eulerAnglesX < maxVerticalAngle && eulerAnglesX > minVerticalAngle)
             {
-                verticalRotationRoot.Rotate(Vector3.right, -verticalMouse * rotationSpeed);
+                verticalRotationRoot.Rotate(Vector3.right, -obj.y * rotationSpeed);
             }
         }
     }
