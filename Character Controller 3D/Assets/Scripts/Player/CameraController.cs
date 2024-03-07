@@ -1,6 +1,5 @@
-namespace CharacterController3D
+namespace Player
 {
-    using System;
     using InputController;
     using Sirenix.OdinInspector;
     using UnityEngine;

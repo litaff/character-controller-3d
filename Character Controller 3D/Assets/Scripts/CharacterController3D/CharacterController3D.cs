@@ -1,7 +1,8 @@
 namespace CharacterController3D
 {
     using System;
-    using InputController;
+    using DG.Tweening;
+    using Extensions;
     using Sirenix.OdinInspector;
     using UnityEngine;
 
@@ -9,90 +10,170 @@ namespace CharacterController3D
     {
         #region Odin Attributes
 
-        private const string COMPONENTS = "Components";
-        private const string SETTINGS = "Settings";
-        private const string DEBUG = "Debug";
+        protected const string COMPONENTS = "Components";
+        protected const string SETTINGS = "Settings";
+        protected const string DEBUG = "Debug";
 
         #endregion
-        
+
         [SerializeField, BoxGroup(COMPONENTS)]
         private Rigidbody rigidbody;
         [SerializeField, BoxGroup(COMPONENTS)]
-        private CameraController cameraController;
-        [SerializeField, BoxGroup(COMPONENTS)]
-        private InputController inputController;
+        private Animator animator;        
+        [SerializeField, BoxGroup(SETTINGS)]
+        private float moveSpeed;
         [SerializeField, BoxGroup(SETTINGS)]
         private float moveForce;
         [SerializeField, BoxGroup(SETTINGS)]
         private float lookSpeed;
         [SerializeField, BoxGroup(SETTINGS)]
         private float jumpForce;
+        [SerializeField, BoxGroup(SETTINGS)]
+        private LayerMask groundingLayers;
         
         [SerializeField, FoldoutGroup(DEBUG)]
         private bool isDebug;
         [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
-        private float horizontal;
+        private float rightInput;
         [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
-        private float vertical;
+        private float forwardInput;
         [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
-        private bool isGrounded;
+        private float requestedRightInput;
+        [SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        private float requestedForwardInput;
+        [field: SerializeField, FoldoutGroup(DEBUG), ShowIf("@isDebug")]
+        public bool IsGrounded { get; private set; }
 
-        private void Awake()
-        {
-            // TEMP: Remove this line
-            inputController.Initialize();
-            
-            inputController.OnMove += OnMoveHandler;
-            inputController.OnJumpDown += OnJumpHandler;
-        }
+        private Vector3 normalizedMoveDirection;
+        private CharacterController3DInAirBehaviour inAirBehaviour;
 
-        private void FixedUpdate()
+        public Vector3 HorizontalVelocity => new(rigidbody.velocity.x, 0f, rigidbody.velocity.z);
+        public Vector3 HorizontalInput => new(rightInput, 0f, forwardInput);
+
+        protected virtual void FixedUpdate()
         {
-            var moveDirection = cameraController.Right * horizontal + cameraController.Forward * vertical;
-            moveDirection.Normalize();
-            
-            if (moveDirection != Vector3.zero)
+            if(IsGrounded && (Math.Abs(rightInput - requestedRightInput) > 0.001f || Math.Abs(forwardInput - requestedForwardInput) > 0.001f))
             {
-                var position = transform.position;
-                transform.LookAt(Vector3.Lerp(position + transform.forward,
-                    position + moveDirection, lookSpeed));
+                rightInput = requestedRightInput;
+                forwardInput = requestedForwardInput;
             }
-
-            rigidbody.AddForce(moveDirection * moveForce, ForceMode.Force);
         }
 
-        private void LateUpdate()
+        protected virtual void LateUpdate()
         {
-            cameraController.transform.position = transform.position;
+            animator.SetFloat("Speed", 6f * (HorizontalVelocity.magnitude / moveSpeed));
         }
 
         private void OnCollisionEnter(Collision collision)
         {
-            if(collision.gameObject.layer == LayerMask.NameToLayer("Default"))
+            if(groundingLayers.Contains(collision.gameObject.layer))
             {
-                isGrounded = true;
-            }
-        }
-        
-        private void OnCollisionExit(Collision collision)
-        {
-            if(collision.gameObject.layer == LayerMask.NameToLayer("Default"))
-            {
-                isGrounded = false;
+                // Triggers jump land animation, which calls OnGroundedHandler
+                animator.SetBool("GroundAble", true);
             }
         }
 
-        private void OnMoveHandler(Vector2 input)
+        private void OnCollisionExit(Collision collision)
         {
-            if (!isGrounded) return;
-            horizontal = input.x;
-            vertical = input.y;
+            if(groundingLayers.Contains(collision.gameObject.layer))
+            {
+                OnUnGroundedHandler();
+            }
+        }
+
+        protected virtual void Initialize()
+        {
+            inAirBehaviour = animator.GetBehaviour<CharacterController3DInAirBehaviour>();
+            inAirBehaviour.OnInAirExit += OnGroundedHandler;
+
+            InitializeDown();
+        }
+
+        protected virtual void InitializeDown()
+        {
+            if (!rigidbody.SweepTest(Vector3.down, out var hit, .01f))
+            {
+                OnUnGroundedHandler();
+                return;
+            }
+            
+            if (groundingLayers.Contains(hit.collider.gameObject.layer))
+            {
+                OnGroundedHandler();
+            }
+            else
+            {
+                OnUnGroundedHandler();
+            }
         }
         
-        private void OnJumpHandler()
+        protected virtual void Move(Vector3 input)
         {
-            if (!isGrounded) return;
+            normalizedMoveDirection = input.normalized;
+            
+            LookTowardsMove(normalizedMoveDirection);
+            
+            if (!IsGrounded) return;
+            
+            // Accelerate to move speed
+            if (HorizontalVelocity.magnitude < moveSpeed)
+            {
+                rigidbody.AddForce(normalizedMoveDirection * moveForce, ForceMode.Force);
+                return;
+            }
+
+            // Don't set velocity if input is zero
+            if (normalizedMoveDirection.magnitude <= 0f) return;
+            
+            rigidbody.velocity = new Vector3(normalizedMoveDirection.x * moveSpeed, rigidbody.velocity.y, normalizedMoveDirection.z * moveSpeed);
+        }
+
+        protected virtual void LookTowardsMove(Vector3 normalizedDirection)
+        {
+            if (normalizedDirection == Vector3.zero) return;
+            var position = transform.position;
+            transform.DOLookAt(position + normalizedDirection, lookSpeed, AxisConstraint.None, transform.up);
+        }
+
+        protected virtual void OnMoveHandler(Vector2 input)
+        {
+            requestedRightInput = input.x;
+            requestedForwardInput = input.y;
+            
+            if (!IsGrounded) return;
+            
+            rightInput = requestedRightInput;
+            forwardInput = requestedForwardInput;
+        }
+
+        protected virtual void OnJumpHandler()
+        {
+            if (!IsGrounded) return;
             rigidbody.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+            animator.SetBool("Jump", true);
+        }
+
+        /// <summary>
+        /// Called when jump land animation ends
+        /// </summary>
+        protected virtual void OnGroundedHandler()
+        {
+            IsGrounded = true;
+            animator.SetBool("FreeFall", false);
+            animator.SetBool("Jump", false);
+        }
+
+        /// <summary>
+        /// Called on grounding collision exit
+        /// </summary>
+        protected virtual void OnUnGroundedHandler()
+        {
+            rightInput = 0;
+            forwardInput = 0;
+            IsGrounded = false;
+            animator.SetBool("GroundAble", false);
+            animator.SetBool("FreeFall", true);
+            animator.SetBool("Jump", false);
         }
     }
 }
