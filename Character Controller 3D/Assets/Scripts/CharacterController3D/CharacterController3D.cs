@@ -61,7 +61,7 @@ namespace CharacterController3D
 
         protected virtual void LateUpdate()
         {
-            animator.SetFloat("Speed", 6f * (HorizontalVelocity.magnitude / moveSpeed));
+            animator.SetFloat("Speed", (HorizontalVelocity.magnitude / moveSpeed));
         }
 
         private void OnCollisionEnter(Collision collision)
